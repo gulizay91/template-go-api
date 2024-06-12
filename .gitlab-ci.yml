@@ -1,0 +1,160 @@
+# This file is a template, and might need editing before it works on your project.
+# This is a sample GitLab CI/CD configuration file that should run without any modifications.
+# It demonstrates a basic 3 stage CI/CD pipeline. Instead of real tests or scripts,
+# it uses echo commands to simulate the pipeline execution.
+#
+# A pipeline is composed of independent jobs that run scripts, grouped into stages.
+# Stages run in sequential order, but jobs within stages run in parallel.
+#
+# For more information, see: https://docs.gitlab.com/ee/ci/yaml/index.html#stages
+#
+# You can copy and paste this template into a new `.gitlab-ci.yml` file.
+# You should not add this template to an existing `.gitlab-ci.yml` file by using the `include:` keyword.
+#
+# To contribute improvements to CI/CD templates, please follow the Development guide at:
+# https://docs.gitlab.com/ee/development/cicd/templates.html
+# This specific template is located at:
+# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Getting-Started.gitlab-ci.yml
+
+stages:          # List of stages for jobs, and their order of execution
+  - build
+  - test
+  - deploy
+
+default:
+  image: docker:latest
+  services:
+    - docker:dind
+
+variables:
+  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_DRIVER: overlay2
+  DOCKER_IMAGE_TAG: $CI_REGISTRY_IMAGE:v$CI_PIPELINE_ID
+  # Define the following variables via service
+  SERVICE_APP_PATH: app
+  SERVICE_NAME: template-go-api
+  SERVICE_PORT: 7001
+  DOCKER_CONTAINER_SERVICE_PORT: 7001
+  # Define the following variables in your GitLab project's CI/CD settings
+#  SERVER_HOST: $SERVER_HOST
+#  SERVER_SSH_USER: $SERVER_SSH_USER
+#  SERVER_SSH_PRIVATE_KEY: $SERVER_SSH_PRIVATE_KEY
+
+unit-test-job:   # This job runs in the test stage.
+  stage: test    # It only starts when the job in the build stage completes successfully.
+  only:
+    refs:
+      - dev
+      - main
+  allow_failure: false
+  script:
+    - echo "Running unit tests... This will take about 1 seconds."
+    - sleep 1
+    - echo "Code coverage is 90%"
+
+build-docker-job-dev:
+  stage: build
+  image: docker:latest
+  environment: development
+  services:
+    - docker:dind
+  allow_failure: false
+  variables:
+    DOCKER_IMAGE_TAG: $CI_REGISTRY_IMAGE:v$CI_PIPELINE_ID
+  before_script:
+    - echo "Logging in to $CI_REGISTRY..."
+    - echo "ci-commit-branch $CI_COMMIT_BRANCH ci-commit-ref $CI_COMMIT_REF_NAME ci-registry-image $CI_REGISTRY_IMAGE"
+    - echo "docker-path $DOCKER_PATH service-app-path $SERVICE_APP_PATH service-name $CI_PROJECT_NAME"
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+  script:
+    - echo "Docker build starting. buildNumber $CI_PIPELINE_ID and image-tag $DOCKER_IMAGE_TAG "
+    - docker build --rm -t $DOCKER_IMAGE_TAG $SERVICE_APP_PATH
+    - docker push $DOCKER_IMAGE_TAG
+    - echo "Docker build complete."
+  rules:
+    - if: $CI_COMMIT_BRANCH == "dev"
+      when: always
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: never
+    - when: manual
+
+deploy-docker-job-dev:
+  #  # Lightweight image with ssh
+  #  image: kroniak/ssh-client
+  stage: deploy  # It only runs when *both* jobs in the test stage complete successfully.
+  environment: development
+  variables:
+    KUBE_NAMESPACE: k8s-ns-dev
+    SERVICE_ENVIRONMENT: dev
+    DOCKER_IMAGE_TAG: $CI_REGISTRY_IMAGE:v$CI_PIPELINE_ID
+  before_script:
+    - echo "server key $SERVER_SSH_PRIVATE_KEY server host $SERVER_HOST server user $SERVER_SSH_USER"
+    # Set right chmod on SSH key file
+    - chmod 400 $SERVER_SSH_PRIVATE_KEY
+  script:
+    - echo "Deploying application to docker to server ..."
+    # Login to Gitlab Container registry
+    - ssh -o StrictHostKeyChecking=no -i $SERVER_SSH_PRIVATE_KEY "${SERVER_SSH_USER}@${SERVER_HOST}" "docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}"
+    # Remove old containers and images if exists
+    - ssh -o StrictHostKeyChecking=no -i $SERVER_SSH_PRIVATE_KEY "${SERVER_SSH_USER}@${SERVER_HOST}"
+      docker rm -f ${CI_PROJECT_NAME} || true
+    - ssh -o StrictHostKeyChecking=no -i $SERVER_SSH_PRIVATE_KEY "${SERVER_SSH_USER}@${SERVER_HOST}" "docker rmi -f \$(docker images -q $CI_REGISTRY_IMAGE) || true"
+    # Download and run new image
+    - ssh -o StrictHostKeyChecking=no -i $SERVER_SSH_PRIVATE_KEY "${SERVER_SSH_USER}@${SERVER_HOST}"
+      docker run
+      --name $CI_PROJECT_NAME
+      -p $SERVICE_PORT:$DOCKER_CONTAINER_SERVICE_PORT
+      -e SERVICE__ENVIRONMENT=$SERVICE_ENVIRONMENT
+      -d $DOCKER_IMAGE_TAG
+    - echo "Application successfully deployed to server."
+  rules:
+    - if: $CI_COMMIT_BRANCH == "dev"
+      when: always
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: never
+    - when: manual
+
+
+build-docker-job-prod:
+  stage: build
+  only:
+    refs:
+      - main
+      - master
+  when: manual
+  image: docker:latest
+  environment: production
+  services:
+    - docker:dind
+  allow_failure: false
+  variables:
+    DOCKER_IMAGE_TAG: $CI_REGISTRY_IMAGE:latest
+  before_script:
+    #- echo "$DOCKER_REGISTRY_PASS" | docker login $DOCKER_REGISTRY --username $DOCKER_REGISTRY_USER --password-stdin
+    - echo "Logging in to $CI_REGISTRY..."
+    - echo "ci-commit-branch $CI_COMMIT_BRANCH ci-commit-ref $CI_COMMIT_REF_NAME ci-registry-image $CI_REGISTRY_IMAGE"
+    - echo "docker-path $DOCKER_PATH service-app-path $SERVICE_APP_PATH service-name $CI_PROJECT_NAME company-name $COMPANY_NAME"
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+  script:
+    - echo "Docker build starting. buildNumber $CI_PIPELINE_ID and image-tag $DOCKER_IMAGE_TAG "
+    - docker build --rm -t $DOCKER_IMAGE_TAG $SERVICE_APP_PATH
+    - docker push $DOCKER_IMAGE_TAG
+    - echo "Docker build complete."
+
+deploy-k8s-job-prod:
+  # Lightweight image with ssh
+  image: kroniak/ssh-client
+  stage: deploy  # It only runs when *both* jobs in the test stage complete successfully.
+  only:
+    refs:
+      - main
+      - master
+  when: manual
+  environment: production
+  variables:
+    KUBE_NAMESPACE: k8s-ns-prod
+    SERVICE_ENVIRONMENT: prod
+    DOCKER_IMAGE_TAG: $CI_REGISTRY_IMAGE:latest
+  script:
+    - sleep 1
+    - echo "Coming soon."
