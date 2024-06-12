@@ -34,7 +34,7 @@ func (router *Router) AddRouter() {
 	// Create routes group.
 	route := router.appRouter.Group("/api/v1")
 
-	route.Get("/chats", getChatHandler)
+	route.Get("/template", GetTemplate)
 }
 
 // HealthCheck godoc
@@ -77,19 +77,27 @@ func ReadyCheck(c *fiber.Ctx) error {
 	return nil
 }
 
-type Chat struct {
+type Template struct {
 	ID      int    `json:"id"`
 	Name    string `json:"name"`
 	Message string `json:"message"`
 }
 
-type CreateChatRequest struct {
-	Name    string `json:"name"`
-	Message string `json:"message"`
-}
+var templateArray []Template
 
-var chatArray []Chat
+// GetTemplate godoc
+// @Summary get template
+// @Description get template
+// @Tags templates
+// @Accept */*
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/template [get]
+func GetTemplate(c *fiber.Ctx) error {
 
-func getChatHandler(c *fiber.Ctx) error {
-	return c.JSON(chatArray)
+	templateArray = append(templateArray, Template{ID: 1, Name: "Name1", Message: "Message1"})
+	templateArray = append(templateArray, Template{ID: 2, Name: "Name2", Message: "Message2"})
+	templateArray = append(templateArray, Template{ID: 3, Name: "Name3", Message: "Message3"})
+
+	return c.JSON(templateArray)
 }

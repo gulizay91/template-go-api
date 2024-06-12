@@ -12,6 +12,22 @@ info:
   title: Template Go API
   version: "1.0"
 paths:
+  /api/v1/template:
+    get:
+      consumes:
+      - '*/*'
+      description: get template
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: get template
+      tags:
+      - templates
   /health:
     get:
       consumes:
