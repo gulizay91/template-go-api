@@ -12,5 +12,5 @@ swag init --parseDependency -g app/cmd/main.go -o app/docs
 ```sh
 # /template-go-api>
 docker build -t template-go-api ./app
-docker run -p 8061:8061 -e SERVICE__ENVIRONMENT=dev --name template-go-api template-go-api
+docker run -p 7001:7001 -e SERVICE__ENVIRONMENT=dev --name template-go-api template-go-api
 ```

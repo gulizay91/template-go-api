@@ -2,7 +2,7 @@
 
 run_docker_restapi:
 	docker build -t template-go-api ./app && \
-		docker run --rm --name template-go-api -p 8061:8061 -e SERVICE__ENVIRONMENT=dev -d template-go-api
+		docker run --rm --name template-go-api -p 7001:7001 -e SERVICE__ENVIRONMENT=dev -d template-go-api
 
 stop_docker_restapi:
 	docker stop template-go-api

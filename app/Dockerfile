@@ -7,7 +7,7 @@ FROM golang:1.22 as builder
 WORKDIR /app
 COPY go.mod go.sum ./
 
-# curl -v "http://127.0.0.1:8061/health"
+# curl -v "http://127.0.0.1:7001/health"
 RUN apt-get update && apt-get install -y wget ca-certificates gnupg \
 && apt-get -y update \
 && apt-get -y install curl \
@@ -33,7 +33,7 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 #ENV SERVICE__ENVIRONMENT=dev
 
-ARG SERVER_PORT=8061
+ARG SERVER_PORT=7001
 ARG SERVER_ADRR=127.0.0.1
 ENV SERVER__PORT $SERVER_PORT
 ENV SERVER__ADRR $SERVER_ADRR
