@@ -23,3 +23,11 @@ make stop_docker_restapi
 make docker_latest_image
 make update_swagger
 ```
+## K8S - Deployment
+```sh
+# /krakend-gateway>
+kubectl apply -k /k8s-manifests
+```
+
+### Kubernetes Network Topology
+![Screenshot](etc/kubernetes-network-topology.drawio.png?raw=true)

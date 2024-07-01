@@ -30,6 +30,8 @@ variables:
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_DRIVER: overlay2
   DOCKER_IMAGE_TAG: $CI_REGISTRY_IMAGE:v$CI_PIPELINE_ID
+  K8S_NAMESPACE_DEV: k8s-ns-dev
+  K8S_NAMESPACE_PROD: k8s-ns-prod
   # Define the following variables via service
   SERVICE_APP_PATH: app
   SERVICE_NAME: template-go-api
@@ -39,6 +41,9 @@ variables:
 #  SERVER_HOST: $SERVER_HOST
 #  SERVER_SSH_USER: $SERVER_SSH_USER
 #  SERVER_SSH_PRIVATE_KEY: $SERVER_SSH_PRIVATE_KEY
+#  $KUBE_SERVER: $KUBE_SERVER # This is the Kubernetes server URL.
+#  $KUBE_TOKEN: $KUBE_TOKEN # This is the Kubernetes token.
+#  $DO_API_TOKEN: $DO_API_TOKEN # This is the DigitalOcean API token.
 
 unit-test-job:   # This job runs in the test stage.
   stage: test    # It only starts when the job in the build stage completes successfully.
@@ -84,7 +89,7 @@ deploy-docker-job-dev:
   stage: deploy  # It only runs when *both* jobs in the test stage complete successfully.
   environment: development
   variables:
-    KUBE_NAMESPACE: k8s-ns-dev
+    KUBE_NAMESPACE: $K8S_NAMESPACE_DEV
     SERVICE_ENVIRONMENT: dev
     DOCKER_IMAGE_TAG: $CI_REGISTRY_IMAGE:v$CI_PIPELINE_ID
   before_script:
@@ -142,8 +147,7 @@ build-docker-job-prod:
     - echo "Docker build complete."
 
 deploy-k8s-job-prod:
-  # Lightweight image with ssh
-  image: kroniak/ssh-client
+  image: dtzar/helm-kubectl
   stage: deploy  # It only runs when *both* jobs in the test stage complete successfully.
   only:
     refs:
@@ -152,9 +156,78 @@ deploy-k8s-job-prod:
   when: manual
   environment: production
   variables:
-    KUBE_NAMESPACE: k8s-ns-prod
+    K8S_NAMESPACE: $K8S_NAMESPACE_PROD
+    K8S_CLUSTER_NAME: default
+    K8S_DOCKER_REGISTRY_SECRET_NAME: gitlab-registry
+    K8S_SERVICE_ACCOUNT: default
     SERVICE_ENVIRONMENT: prod
     DOCKER_IMAGE_TAG: $CI_REGISTRY_IMAGE:latest
+    MANIFEST_PATH: k8s-manifests
+  before_script:
+    - echo "server url $KUBE_SERVER server token $KUBE_TOKEN"
+    - apk update && apk add gettext # envsubst
+    # create the configuration (context) for our kubernetes cluster
+    - kubectl config set-cluster $K8S_CLUSTER_NAME --server="$KUBE_SERVER" --insecure-skip-tls-verify
+    - kubectl config set-credentials gitlab --token=$(echo $KUBE_TOKEN | base64 -d)
+    - kubectl config set-context $K8S_CLUSTER_NAME --cluster=$K8S_CLUSTER_NAME --namespace=$K8S_NAMESPACE --user=gitlab
+    - kubectl config use-context $K8S_CLUSTER_NAME
+    - echo "registry $CI_REGISTRY deploy-user $CI_DEPLOY_USER deploy-pass $CI_DEPLOY_PASSWORD registry-user $CI_REGISTRY_USER registry-pass $CI_REGISTRY_PASSWORD"
+    - kubectl delete secret -n $K8S_NAMESPACE $K8S_DOCKER_REGISTRY_SECRET_NAME --ignore-not-found || true
+    - kubectl create secret --namespace=$K8S_NAMESPACE docker-registry gitlab-registry --docker-server=$CI_REGISTRY --docker-username=$CI_DEPLOY_USER --docker-password=$CI_DEPLOY_PASSWORD || true
+    #    - >-
+    #      kubectl patch serviceaccount $K8S_SERVICE_ACCOUNT -p '{"imagePullSecrets":[{"name":"'$K8S_DOCKER_REGISTRY_SECRET_NAME'"}]}' -n $K8S_NAMESPACE
+    - >-
+      kubectl patch serviceaccount default -p '{"imagePullSecrets":[{"name":"'$K8S_DOCKER_REGISTRY_SECRET_NAME'"}]}' -n $K8S_NAMESPACE
   script:
-    - sleep 1
-    - echo "Coming soon."
+    - echo "Deploying application to kubernetes server ..."
+    - envsubst < $MANIFEST_PATH/config.yaml | kubectl apply -f -
+    - envsubst < $MANIFEST_PATH/hpa.yaml | kubectl apply -f -
+    - envsubst < $MANIFEST_PATH/ingress.yaml | kubectl apply -f -
+    - envsubst < $MANIFEST_PATH/deployment.yaml | kubectl apply -f -
+    - envsubst < $MANIFEST_PATH/service.yaml | kubectl apply -f -
+    #    - kubectl rollout status -n "$K8S_NAMESPACE" -w "deployment/$SERVICE_NAME" || true
+    - echo "Application successfully deployed to kubernetes."
+
+deploy-dok-job-prod:
+  stage: deploy
+  image: alpine:latest
+  only:
+    refs:
+      - main
+      - master
+  when: manual
+  environment: production
+  variables:
+    K8S_NAMESPACE: $K8S_NAMESPACE_PROD
+    K8S_CLUSTER_NAME: default
+    K8S_DOCKER_REGISTRY_SECRET_NAME: gitlab-registry-secret
+    SERVICE_ENVIRONMENT: prod
+    DOCKER_IMAGE_TAG: $CI_REGISTRY_IMAGE:latest
+    MANIFEST_PATH: k8s-manifests
+  before_script:
+    - apk add --no-cache curl gettext
+    - curl -LO "https://github.com/digitalocean/doctl/releases/download/v1.73.0/doctl-1.73.0-linux-amd64.tar.gz"
+    - tar -xzvf doctl-1.73.0-linux-amd64.tar.gz
+    - mv doctl /usr/local/bin/
+    - curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+    - chmod +x ./kubectl
+    - mv kubectl /usr/local/bin/
+    - mkdir -p ~/.kube
+    # DO_API_TOKEN to authenticate with DigitalOcean
+    - doctl auth init -t $DO_API_TOKEN
+    # DigitalOcean Kubernetes Cluster Info
+    - doctl kubernetes cluster kubeconfig save $K8S_CLUSTER_NAME
+    # Docker registry secret
+    - kubectl delete secret -n $K8S_NAMESPACE $K8S_DOCKER_REGISTRY_SECRET_NAME --ignore-not-found || true
+    - kubectl create secret docker-registry $K8S_DOCKER_REGISTRY_SECRET_NAME --docker-server=$CI_REGISTRY --docker-username=$CI_DEPLOY_USER --docker-password=$CI_DEPLOY_PASSWORD --namespace=$K8S_NAMESPACE || true
+    - >-
+      kubectl patch serviceaccount default -p '{"imagePullSecrets":[{"name":"'$K8S_DOCKER_REGISTRY_SECRET_NAME'"}]}' -n $K8S_NAMESPACE
+  script:
+    - echo "Deploying application to kubernetes server ..."
+    - envsubst < $MANIFEST_PATH/config.yaml | kubectl apply -n $K8S_NAMESPACE -f -
+    - envsubst < $MANIFEST_PATH/hpa.yaml | kubectl apply -n $K8S_NAMESPACE -f -
+    - envsubst < $MANIFEST_PATH/ingress.yaml | kubectl apply -n $K8S_NAMESPACE -f -
+    - envsubst < $MANIFEST_PATH/deployment.yaml | kubectl apply -n $K8S_NAMESPACE -f -
+    - envsubst < $MANIFEST_PATH/service.yaml | kubectl apply -n $K8S_NAMESPACE -f -
+    #      - kubectl rollout status -n $K8S_NAMESPACE_PROD -w deployment/$SERVICE_NAME || true
+    - echo "Application successfully deployed to kubernetes."
