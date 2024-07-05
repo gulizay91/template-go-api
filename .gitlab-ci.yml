@@ -139,7 +139,7 @@ build-docker-job-prod:
     - echo "Logging in to $CI_REGISTRY..."
     - echo "ci-commit-branch $CI_COMMIT_BRANCH ci-commit-ref $CI_COMMIT_REF_NAME ci-registry-image $CI_REGISTRY_IMAGE"
     - echo "docker-path $DOCKER_PATH service-app-path $SERVICE_APP_PATH service-name $CI_PROJECT_NAME company-name $COMPANY_NAME"
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    - docker login $CI_REGISTRY -u $CI_DEPLOY_USER -p $CI_DEPLOY_PASSWORD
   script:
     - echo "Docker build starting. buildNumber $CI_PIPELINE_ID and image-tag $DOCKER_IMAGE_TAG "
     - docker build --rm -t $DOCKER_IMAGE_TAG $SERVICE_APP_PATH
@@ -157,8 +157,8 @@ deploy-k8s-job-prod:
   environment: production
   variables:
     K8S_NAMESPACE: $K8S_NAMESPACE_PROD
-    K8S_CLUSTER_NAME: default
-    K8S_DOCKER_REGISTRY_SECRET_NAME: gitlab-registry
+    K8S_CLUSTER_NAME: k8s-default-cluster
+    K8S_DOCKER_REGISTRY_SECRET_NAME: gitlab-registry-$SERVICE_NAME
     K8S_SERVICE_ACCOUNT: default
     SERVICE_ENVIRONMENT: prod
     DOCKER_IMAGE_TAG: $CI_REGISTRY_IMAGE:latest
@@ -199,11 +199,12 @@ deploy-dok-job-prod:
   environment: production
   variables:
     K8S_NAMESPACE: $K8S_NAMESPACE_PROD
-    K8S_CLUSTER_NAME: default
-    K8S_DOCKER_REGISTRY_SECRET_NAME: gitlab-registry-secret
+    K8S_CLUSTER_NAME: k8s-default-cluster
+    K8S_DOCKER_REGISTRY_SECRET_NAME: gitlab-registry-secret-$SERVICE_NAME
     SERVICE_ENVIRONMENT: prod
     DOCKER_IMAGE_TAG: $CI_REGISTRY_IMAGE:latest
     MANIFEST_PATH: k8s-manifests
+    SERVICE_PORT: 80 # service cluster port
   before_script:
     - apk add --no-cache curl gettext
     - curl -LO "https://github.com/digitalocean/doctl/releases/download/v1.73.0/doctl-1.73.0-linux-amd64.tar.gz"
@@ -220,8 +221,6 @@ deploy-dok-job-prod:
     # Docker registry secret
     - kubectl delete secret -n $K8S_NAMESPACE $K8S_DOCKER_REGISTRY_SECRET_NAME --ignore-not-found || true
     - kubectl create secret docker-registry $K8S_DOCKER_REGISTRY_SECRET_NAME --docker-server=$CI_REGISTRY --docker-username=$CI_DEPLOY_USER --docker-password=$CI_DEPLOY_PASSWORD --namespace=$K8S_NAMESPACE || true
-    - >-
-      kubectl patch serviceaccount default -p '{"imagePullSecrets":[{"name":"'$K8S_DOCKER_REGISTRY_SECRET_NAME'"}]}' -n $K8S_NAMESPACE
   script:
     - echo "Deploying application to kubernetes server ..."
     - envsubst < $MANIFEST_PATH/config.yaml | kubectl apply -n $K8S_NAMESPACE -f -
@@ -229,5 +228,4 @@ deploy-dok-job-prod:
     - envsubst < $MANIFEST_PATH/ingress.yaml | kubectl apply -n $K8S_NAMESPACE -f -
     - envsubst < $MANIFEST_PATH/deployment.yaml | kubectl apply -n $K8S_NAMESPACE -f -
     - envsubst < $MANIFEST_PATH/service.yaml | kubectl apply -n $K8S_NAMESPACE -f -
-    #      - kubectl rollout status -n $K8S_NAMESPACE_PROD -w deployment/$SERVICE_NAME || true
     - echo "Application successfully deployed to kubernetes."

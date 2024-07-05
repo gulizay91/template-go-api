@@ -29,5 +29,30 @@ make update_swagger
 kubectl apply -k /k8s-manifests
 ```
 
+### DigitalOcean Kubernetes Cluster
+![Gif](etc/digitalocean-kubernetes.gif)
+
+Follow the instructions for connection digital ocean kubernetes cluster
+
+![Gif](etc/digitalocean-connection-cluster.gif)
+
+```sh
+doctl kubernetes cluster kubeconfig save <your-token>
+kubectl cluster-info
+```
+![Gif](etc/check-kubernetes-connection.gif)
+
+Also we need Kubernetes Metric Server for horizontal pod autoscaler (hpa.yaml)
+![Screenshot](etc/digitalocean-marketplace.png?raw=true)
+
+Make sure Add DO_API_TOKEN variable to GitLab CI/CD Settings Variables, and CI_DEPLOY_USER and CI_DEPLOY_PASSWORD for the docker registry in access token
+![Screenshot](etc/gitlab-variables.png?raw=true)
+
+Run GitLab Pipeline, Deploy to DigitalOcean Kubernetes cluster
+![Gif](etc/gitlab-pipeline-deploy-dok.gif)
+
+Check Kubernetes Deployment
+![Gif](etc/check-kubernetes-deployment.gif)
+
 ### Kubernetes Network Topology
 ![Screenshot](etc/kubernetes-network-topology.drawio.png?raw=true)
