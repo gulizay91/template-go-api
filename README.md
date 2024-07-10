@@ -1,5 +1,43 @@
 # template-go-api
 
+## Folder Structure
+ref: https://www.youtube.com/watch?v=dxPakeBsgl4
+```
+├── README.md
+├── app
+│   ├── cmd
+│   │   ├── main.go                     // entry point
+│   │   └── services
+│   │       ├── services.go             // run all services
+│   │       ├── config.service.go       // init config
+│   │       └── framework.service.go    // init router
+│   ├── config
+│   │   └── config.go                   // all config models
+│   ├── Dockerfile                      // dockerfile
+│   ├── env.example.yaml                // environment variables
+│   ├── go.mod
+│   ├── go.sum
+│   ├── docs
+│   │   └── docs.go
+│   │   └── swagger.yaml                // swagger files
+│   ├── routers
+│   │   └── router.go                   // all endpoints
+│   ├── pkg
+│   │   ├── handlers                    // all handlers
+│   │   ├── models                      // all dtos
+│   │   ├── repository                  // all repositories
+│   │   │   └── entities                // all db entities
+│       └── service                     // all services
+├── .gitlab-ci.yml                      // devops ci/cd
+├── k8s-manifests
+│   ├── .env                            // define base environment variables
+│   ├── deployment.yaml                 // kubernetes deployment
+│   ├── config.yaml                     // kubernetes service configMap
+│   ├── hpa.yaml                        // kubernetes service horizontal pod autoscaler
+│   ├── ingress.yaml                    // kubernetes service ingress
+│   └── service.yaml                    // kubernetes service on cluster
+```
+
 ## Swagger
 ## Generate Swagger Doc
 ```sh
