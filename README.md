@@ -49,8 +49,8 @@ swag init --parseDependency -g app/cmd/main.go -o app/docs
 ### build docker image
 ```sh
 # /template-go-api>
-docker build -t template-go-api ./app
-docker run -p 7001:7001 -e SERVICE__ENVIRONMENT=dev --name template-go-api template-go-api
+docker build --build-arg SERVICE_PORT=7001 -t template-go-api ./app
+docker run -p 7001:7001 -e SERVICE__ENVIRONMENT=dev -e SERVICE__PORT=7001 --name template-go-api template-go-api
 ```
 or you can use phony target
 ### makefile

@@ -18,14 +18,13 @@ func InitFiber() *fiber.App {
 
 	registerRouters(app)
 
-	log.Debugf("Server Now Listen %s:%s", config.Server.Addr, config.Server.Port)
-	//log.Fatal(app.Listen(":" + config.Server.Port))
-	//if err := app.Listen(":" + config.Server.Port); err != nil {
+	//log.Fatal(app.Listen(":" + config.Service.Port))
+	//if err := app.Listen(":" + config.Service.Port); err != nil {
 	//	log.Panic(err)
 	//}
 	serverError = make(chan error, 1)
 	go func() {
-		if err := app.Listen(":" + config.Server.Port); err != nil {
+		if err := app.Listen(":" + config.Service.Port); err != nil {
 			log.Panic(err)
 			serverError <- err
 		}
