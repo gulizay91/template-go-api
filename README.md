@@ -20,14 +20,15 @@ ref: https://www.youtube.com/watch?v=dxPakeBsgl4
 │   ├── docs
 │   │   └── docs.go
 │   │   └── swagger.yaml                // swagger files
-│   ├── routers
-│   │   └── router.go                   // all endpoints
-│   ├── pkg
+│   ├── internal
 │   │   ├── handlers                    // all handlers
 │   │   ├── models                      // all dtos
 │   │   ├── repository                  // all repositories
 │   │   │   └── entities                // all db entities
-│       └── service                     // all services
+│   │   ├── routers                     // all routers
+│   │   │   └── router.go               // all endpoints
+│   │   └── service                     // all services
+│   ├── pkg                             // public, reusable packages
 ├── .gitlab-ci.yml                      // devops ci/cd
 ├── k8s-manifests
 │   ├── .env                            // define base environment variables

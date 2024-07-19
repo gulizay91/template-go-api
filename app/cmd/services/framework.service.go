@@ -4,7 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/gulizay91/template-go-api/routers"
+	"github.com/gulizay91/template-go-api/internal/routers"
 )
 
 var serverError chan error
@@ -34,7 +34,11 @@ func InitFiber() *fiber.App {
 }
 
 func registerRouters(app *fiber.App) {
-	routers.NewRouter(app).AddRouter()
+	// Create a new Router with RabbitMQ connection
+	router := routers.NewRouter(app, config, AmqpConn, AmqpChannel)
+
+	// Register routes
+	router.AddRouter()
 
 	log.Debug("Routers Registered.")
 }

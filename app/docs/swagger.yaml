@@ -1,4 +1,19 @@
 basePath: /
+definitions:
+  github_com_gulizay91_template-go-api_internal_models.Message:
+    properties:
+      body:
+        type: string
+    type: object
+  github_com_gulizay91_template-go-api_internal_models.Template:
+    properties:
+      id:
+        type: integer
+      message:
+        type: string
+      name:
+        type: string
+    type: object
 info:
   contact:
     email: gulizay91@gmail.com
@@ -23,9 +38,38 @@ paths:
         "200":
           description: OK
           schema:
+            items:
+              $ref: '#/definitions/github_com_gulizay91_template-go-api_internal_models.Template'
+            type: array
+      summary: get template
+      tags:
+      - templates
+  /api/v1/template/message:
+    post:
+      consumes:
+      - application/json
+      description: send message to rabbitmq queue
+      parameters:
+      - description: Message
+        in: body
+        name: message
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_gulizay91_template-go-api_internal_models.Message'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
             additionalProperties: true
             type: object
-      summary: get template
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: send template message
       tags:
       - templates
   /health:

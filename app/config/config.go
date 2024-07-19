@@ -6,13 +6,15 @@ import (
 )
 
 type Config struct {
-	Service ServiceConfig `mapstructure:"service"`
+	Service  ServiceConfig  `mapstructure:"service"`
+	RabbitMQ RabbitMQConfig `mapstructure:"rabbitMq"`
 }
 
 func (config *Config) Validate() error {
 	err := validation.ValidateStruct(
 		config,
 		validation.Field(&config.Service),
+		validation.Field(&config.RabbitMQ),
 	)
 	return err
 }
@@ -30,6 +32,22 @@ func (config ServiceConfig) Validate() error {
 		validation.Field(&config.Port, is.Port),
 		validation.Field(&config.LogLevel, validation.Required),
 		validation.Field(&config.Environment, validation.Required),
+	)
+	return err
+}
+
+type RabbitMQConfig struct {
+	Hosts    []string
+	Username string
+	Password string
+}
+
+func (config RabbitMQConfig) Validate() error {
+	err := validation.ValidateStruct(
+		&config,
+		validation.Field(&config.Hosts, validation.Required),
+		validation.Field(&config.Username, validation.Required),
+		validation.Field(&config.Password, validation.Required),
 	)
 	return err
 }
