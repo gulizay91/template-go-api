@@ -4,6 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gulizay91/template-go-api/internal/models"
 	"github.com/gulizay91/template-go-api/internal/routers"
 )
 
@@ -35,7 +36,11 @@ func InitFiber() *fiber.App {
 
 func registerRouters(app *fiber.App) {
 	// Create a new Router with RabbitMQ connection
-	router := routers.NewRouter(app, config, AmqpConn, AmqpChannel)
+	amqpChannel, err := BrokerManager.GetChannel(string(models.TemplateExchangeName))
+	if err != nil {
+		log.Panic("Rabbitmq Channel not found")
+	}
+	router := routers.NewRouter(app, config, BrokerManager.Conn, amqpChannel)
 
 	// Register routes
 	router.AddRouter()
