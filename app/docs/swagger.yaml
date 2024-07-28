@@ -3,6 +3,7 @@ definitions:
   github_com_gulizay91_template-go-api_internal_models.Message:
     properties:
       body:
+        example: '{"message": "template message body"}'
         type: string
     type: object
   github_com_gulizay91_template-go-api_internal_models.Template:

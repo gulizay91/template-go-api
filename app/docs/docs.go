@@ -146,7 +146,8 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "body": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "{\"message\": \"template message body\"}"
                 }
             }
         },
